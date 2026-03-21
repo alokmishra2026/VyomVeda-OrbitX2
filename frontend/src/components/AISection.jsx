@@ -26,6 +26,29 @@ const AISection = () => {
     }
   }, [messages]);
 
+  // Local Fallback AI Knowledge Base
+  const generateFallbackResponse = (query) => {
+    const q = query.toLowerCase();
+    if (q.includes("hello") || q.includes("hi") || q.includes("namaste")) return "Greetings Commander. VyomVeda AI systems are online and monitoring orbital status.";
+    if (q.includes("isro")) return "ISRO's latest Gaganyaan telemetry is stable. Geosynchronous satellites are operating at 99.8% optimal efficiency.";
+    if (q.includes("nasa")) return "Connecting to NASA public JPL feeds... Artemis mission data synced. No anomalies detected in the lunar gateway sector.";
+    if (q.includes("status") || q.includes("report")) return "System Report: Orbital mechanics nominal. Space weather is calm. AI Cognitive Status is at 94% neural sync.";
+    if (q.includes("satellite") || q.includes("satBuilder")) return "The Nano-Sat Forge (SatBuilder) currently has 4 open orbital slots. You can configure power cores and laser comms from the Future Hub.";
+    if (q.includes("sos") || q.includes("emergency")) return "Global SOS system is standing by. We have 14 military satellites ready to relay distress signals continuously.";
+    if (q.includes("weather") || q.includes("flare")) return "Warning: Minor solar flare activity detected in Sector-4. Recommendation is to shield micro-satellites for the next 14 minutes.";
+    if (q.includes("who are you") || q.includes("your name")) return "I am the VyomVeda AI Brain, an advanced cognitive system created to manage the OrbitX space ecosystem. I was developed by Alok Mishra.";
+    if (q.includes("alok") || q.includes("mishra")) return "Alok Mishra is the Chief Architect and Creator of the VyomVeda OrbitX ecosystem. All core AI directives point to his engineering.";
+    
+    // Default generic response
+    const defaults = [
+      "Command received. Analyzing telemetry data... Result nominal.",
+      "Acknowledged. Processing your request through the neural matrix.",
+      "That query requires deeper clearance. For now, I can confirm all orbital modules are green.",
+      "I am currently operating in Local Database Mode. Connect the central API for deeper cognitive answers."
+    ];
+    return defaults[Math.floor(Math.random() * defaults.length)];
+  };
+
   const handleSend = async () => {
     if (!input.trim()) return;
     const userText = input;
@@ -35,15 +58,20 @@ const AISection = () => {
 
     const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
     if (!apiKey || apiKey === 'your_openai_api_key_here' || apiKey.startsWith('AIzaSyD_')) {
-       // Using the YouTube mock key check as a fallback prevention
-       if (!apiKey || apiKey.includes('your_')) {
-          const errorMsg = "SYSTEM ERROR: OpenAI API Key not configured. Please add VITE_OPENAI_API_KEY to your frontend .env file to enable live AI responses.";
+       // FALLBACK LOCAL AI
+       setTimeout(() => {
+          setMessages(prev => [...prev, { role: 'assistant', text: '...' }]);
           setTimeout(() => {
-             setMessages(prev => [...prev, { role: 'assistant', text: errorMsg }]);
-             speak("System error. API configuration required.");
-          }, 500);
-          return;
-       }
+            const fallbackText = generateFallbackResponse(userText);
+            setMessages(prev => {
+                const newMsgs = [...prev];
+                newMsgs[newMsgs.length - 1] = { role: 'assistant', text: fallbackText };
+                return newMsgs;
+            });
+            speak(fallbackText);
+          }, 600);
+       }, 300);
+       return;
     }
 
     try {
