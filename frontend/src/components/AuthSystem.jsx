@@ -5,22 +5,47 @@ import { User, Lock, Mail, X, Orbit } from 'lucide-react';
 const AuthSystem = ({ onClose, onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleRequestOTP = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMsg('');
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to send OTP');
+      
+      setOtpSent(true);
+      setSuccessMsg('Security code dispatched to your comms channel.');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerify = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-      // Use relative path for Vite proxy
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, otp })
       });
       const data = await response.json();
 
@@ -75,45 +100,69 @@ const AuthSystem = ({ onClose, onLogin }) => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2 text-left">
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                <input 
-                  type="email" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full bg-black/40 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-mono"
-                  placeholder="agent@vyomveda.com"
-                />
-              </div>
+          {successMsg && (
+            <div className="bg-green-500/10 border border-green-500/50 text-green-400 p-3 rounded mb-6 text-sm text-center">
+              {successMsg}
             </div>
+          )}
 
-            <div className="space-y-2 text-left">
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Security Code</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-                <input 
-                  type="password" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full bg-black/40 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-mono"
-                  placeholder="••••••••"
-                />
+          {!otpSent ? (
+            <form onSubmit={handleRequestOTP} className="space-y-6">
+              <div className="space-y-2 text-left">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Email Address</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  <input 
+                    type="email" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="w-full bg-black/40 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-mono"
+                    placeholder="agent@vyomveda.com"
+                  />
+                </div>
               </div>
-            </div>
-
-            <button 
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 glass-panel neon-border-blue font-bold text-blue-400 hover:bg-[var(--neon-blue)] hover:text-black transition-all tracking-widest uppercase text-sm disabled:opacity-50"
-            >
-              {loading ? 'Processing...' : isLogin ? 'Initialize Link' : 'Register Identity'}
-            </button>
-          </form>
+              <button 
+                type="submit"
+                disabled={loading}
+                className="w-full py-4 glass-panel neon-border-blue font-bold text-blue-400 hover:bg-[var(--neon-blue)] hover:text-black transition-all tracking-widest uppercase text-sm disabled:opacity-50"
+              >
+                {loading ? 'Transmitting...' : 'Request Secure Link (OTP)'}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleVerify} className="space-y-6">
+              <div className="space-y-2 text-left">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Awaiting 6-Digit Verification Code</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                  <input 
+                    type="text" 
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    required
+                    maxLength={6}
+                    className="w-full bg-black/40 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-white placeholder-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-mono text-center tracking-[1em] text-xl"
+                    placeholder="------"
+                  />
+                </div>
+              </div>
+              <button 
+                type="submit"
+                disabled={loading || otp.length < 6}
+                className="w-full py-4 glass-panel neon-border-blue font-bold text-blue-400 hover:bg-[var(--neon-blue)] hover:text-black transition-all tracking-widest uppercase text-sm disabled:opacity-50"
+              >
+                {loading ? 'Verifying...' : isLogin ? 'Initialize System Access' : 'Register Identity Credentials'}
+              </button>
+              <button 
+                type="button"
+                onClick={() => setOtpSent(false)}
+                className="w-full py-2 text-xs text-gray-400 hover:text-white transition-all underline decoration-gray-600 underline-offset-4"
+              >
+                Use a different email address?
+              </button>
+            </form>
+          )}
 
           <div className="mt-6 text-center">
             <button 

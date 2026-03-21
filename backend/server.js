@@ -5,6 +5,7 @@ import http from 'http';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
+import nodemailer from 'nodemailer';
 import User from './models/User.js';
 import SystemLog from './models/SystemLog.js';
 
@@ -56,19 +57,74 @@ const adminAuth = (req, res, next) => {
   }
 };
 
-// Auth Routes
+// OTP Store (In-Memory for simplicity)
+const otpStore = new Map(); // email -> { otp, expiresAt }
+
+// Nodemailer setup
+let transporter;
+nodemailer.createTestAccount().then((account) => {
+  transporter = nodemailer.createTransport({
+    host: account.smtp.host,
+    port: account.smtp.port,
+    secure: account.smtp.secure,
+    auth: { user: account.user, pass: account.pass }
+  });
+  console.log("📧 Ethereal Email Ready for OTPs");
+}).catch(console.error);
+
+app.post('/api/auth/send-otp', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email required' });
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  otpStore.set(email.toLowerCase(), {
+    otp,
+    expiresAt: Date.now() + 10 * 60 * 1000 // 10 mins
+  });
+
+  try {
+    if (transporter) {
+      let info = await transporter.sendMail({
+        from: '"VyomVeda OrbitX" <auth@vyomveda.com>',
+        to: email,
+        subject: "Your OrbitX Security Code",
+        text: `Your one-time security code is: ${otp}. It expires in 10 minutes.`,
+        html: `<div style="font-family: monospace; background: #000; color: #00f3ff; padding: 20px; border: 1px solid #00f3ff; border-radius: 8px;">
+                 <h2 style="color: white; margin-bottom: 5px;">VyomVeda OrbitX</h2>
+                 <p style="color: #666; font-size: 12px; margin-top: 0;">GLOBAL SATELLITE NETWORK</p>
+                 <br/>
+                 <p>Identity Verification Code:</p>
+                 <h1 style="color: #00f3ff; letter-spacing: 5px; font-size: 32px;">${otp}</h1>
+                 <p style="color: #444; font-size: 11px;">Valid for 10 minutes.</p>
+               </div>`
+      });
+      console.log("✉️ OTP Email sent! View it here: ", nodemailer.getTestMessageUrl(info));
+    }
+    res.json({ message: 'OTP sent successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+});
+
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, otp } = req.body;
     if (mongoose.connection.readyState !== 1) {
-      return res.status(503).json({ error: 'Database not ready. Please try again later.' });
+      return res.status(503).json({ error: 'Database not ready.' });
+    }
+
+    const storedData = otpStore.get(email.toLowerCase());
+    if (!storedData || storedData.otp !== otp || storedData.expiresAt < Date.now()) {
+      return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
 
     let user = await User.findOne({ email: email.toLowerCase() });
     if (user) return res.status(400).json({ error: 'User already exists' });
 
-    user = new User({ email: email.toLowerCase(), password });
+    user = new User({ email: email.toLowerCase(), password: 'otp-login-only' });
     await user.save();
+    otpStore.delete(email.toLowerCase()); // consume OTP
     
     try { await new SystemLog({ action: 'Registration', details: email }).save(); } catch(e){}
 
@@ -82,12 +138,17 @@ app.post('/api/auth/register', async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email: email.toLowerCase() });
-    if (!user) return res.status(400).json({ error: 'Invalid credentials' });
+    const { email, otp } = req.body;
+    
+    const storedData = otpStore.get(email.toLowerCase());
+    if (!storedData || storedData.otp !== otp || storedData.expiresAt < Date.now()) {
+      return res.status(400).json({ error: 'Invalid or expired OTP' });
+    }
 
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) return res.status(400).json({ error: 'Invalid credentials' });
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) return res.status(400).json({ error: 'Account not found. Please register.' });
+
+    otpStore.delete(email.toLowerCase()); // consume OTP
 
     try { await new SystemLog({ action: 'Login', details: email }).save(); } catch(e){}
 
