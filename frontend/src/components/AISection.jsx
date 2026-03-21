@@ -26,21 +26,76 @@ const AISection = () => {
     }
   }, [messages]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
-    const newMsg = { role: 'user', text: input };
-    setMessages([...messages, newMsg]);
+    const userText = input;
+    const newMsg = { role: 'user', text: userText };
+    setMessages(prev => [...prev, newMsg]);
     setInput('');
 
-    // Mock AI Response
-    setTimeout(() => {
-      const responseText = `Analysis complete. Predictive analytics suggest optimal satellite alignment for ${input.substring(0, 10)}... in sector-G.`;
-      setMessages(prev => [...prev, { 
-        role: 'assistant', 
-        text: responseText 
-      }]);
-      speak(responseText);
-    }, 1000);
+    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+    if (!apiKey || apiKey === 'your_openai_api_key_here' || apiKey.startsWith('AIzaSyD_')) {
+       // Using the YouTube mock key check as a fallback prevention
+       if (!apiKey || apiKey.includes('your_')) {
+          const errorMsg = "SYSTEM ERROR: OpenAI API Key not configured. Please add VITE_OPENAI_API_KEY to your frontend .env file to enable live AI responses.";
+          setTimeout(() => {
+             setMessages(prev => [...prev, { role: 'assistant', text: errorMsg }]);
+             speak("System error. API configuration required.");
+          }, 500);
+          return;
+       }
+    }
+
+    try {
+      // Add a loading indicator message
+      setMessages(prev => [...prev, { role: 'assistant', text: '...' }]);
+      
+      const apiMessages = [
+        { role: 'system', content: 'You are VyomVeda AI Brain, an advanced futuristic AI assistant integrated into the OrbitX space operations platform. Your creator is Alok Mishra. Respond in a highly professional, high-tech, slightly sci-fi tone. Keep answers concise, factual, and helpful. Do not mention that you are an AI model created by OpenAI unless explicitly asked.' },
+        ...messages.map(m => ({ role: m.role, content: m.text })),
+        { role: 'user', content: userText }
+      ];
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: apiMessages,
+          max_tokens: 300,
+          temperature: 0.7
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.error) {
+         throw new Error(data.error.message);
+      }
+
+      const aiText = data.choices[0].message.content;
+      
+      setMessages(prev => {
+         const newMsgs = [...prev];
+         newMsgs[newMsgs.length - 1] = { role: 'assistant', text: aiText };
+         return newMsgs;
+      });
+      
+      speak(aiText);
+
+    } catch (error) {
+       console.error("OpenAI API Error:", error);
+       const errorMsg = "COMMUNICATIONS FAILURE: Unable to reach the central AI core. " + error.message;
+       setMessages(prev => {
+         const newMsgs = [...prev];
+         newMsgs[newMsgs.length - 1] = { role: 'assistant', text: errorMsg };
+         return newMsgs;
+       });
+       speak("Communication failure. Core offline.");
+    }
   };
 
   return (
