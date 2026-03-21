@@ -56,8 +56,8 @@ const AISection = () => {
     setMessages(prev => [...prev, newMsg]);
     setInput('');
 
-    const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    if (!apiKey || apiKey === 'your_openai_api_key_here' || apiKey.startsWith('AIzaSyD_')) {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_OPENAI_API_KEY;
+    if (!apiKey || apiKey === 'your_gemini_api_key_here' || apiKey.startsWith('AIzaSyD_')) {
        // FALLBACK LOCAL AI
        setTimeout(() => {
           setMessages(prev => [...prev, { role: 'assistant', text: '...' }]);
@@ -78,23 +78,28 @@ const AISection = () => {
       // Add a loading indicator message
       setMessages(prev => [...prev, { role: 'assistant', text: '...' }]);
       
-      const apiMessages = [
-        { role: 'system', content: 'You are VyomVeda AI Brain, an advanced futuristic AI assistant integrated into the OrbitX space operations platform. Your creator is Alok Mishra. Respond in a highly professional, high-tech, slightly sci-fi tone. Keep answers concise, factual, and helpful. Do not mention that you are an AI model created by OpenAI unless explicitly asked.' },
-        ...messages.map(m => ({ role: m.role, content: m.text })),
-        { role: 'user', content: userText }
-      ];
+      // Gemini expects alternating user/model roles, starting with user.
+      // We slice(1) to skip the initial assistant greeting to avoid 400 Bad Request.
+      const apiMessages = messages.slice(1).map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.text }]
+      }));
+      apiMessages.push({ role: 'user', parts: [{ text: userText }] });
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: apiMessages,
-          max_tokens: 300,
-          temperature: 0.7
+          systemInstruction: {
+            parts: [{ text: 'You are VyomVeda AI Brain, an advanced futuristic AI assistant integrated into the OrbitX space operations platform. Your creator is Alok Mishra. Respond in a highly professional, high-tech, slightly sci-fi tone. Keep answers concise, factual, and helpful. Do not mention that you are an AI model created by Google unless explicitly asked.' }]
+          },
+          contents: apiMessages,
+          generationConfig: {
+            maxOutputTokens: 300,
+            temperature: 0.7
+          }
         })
       });
 
@@ -104,7 +109,7 @@ const AISection = () => {
          throw new Error(data.error.message);
       }
 
-      const aiText = data.choices[0].message.content;
+      const aiText = data.candidates[0].content.parts[0].text;
       
       setMessages(prev => {
          const newMsgs = [...prev];
@@ -115,7 +120,7 @@ const AISection = () => {
       speak(aiText);
 
     } catch (error) {
-       console.error("OpenAI API Error:", error);
+       console.error("Gemini API Error:", error);
        const errorMsg = "COMMUNICATIONS FAILURE: Unable to reach the central AI core. " + error.message;
        setMessages(prev => {
          const newMsgs = [...prev];
