@@ -11,7 +11,9 @@ import {
   Zap,
   Bot,
   User,
-  LogOut
+  LogOut,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 
 // Use React.lazy so any failing component is caught by ErrorBoundary
@@ -37,6 +39,35 @@ function App() {
   const [themeColor, setThemeColor] = useState('#00f3ff');
   const [user, setUser] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
+  
+  // Audio State
+  const [isMuted, setIsMuted] = useState(true);
+  const audioRef = React.useRef(null);
+
+  // Play audio on first user interaction
+  useEffect(() => {
+    const startAudio = () => {
+      if (audioRef.current && isMuted) {
+        audioRef.current.volume = 0.4;
+        audioRef.current.play().then(() => setIsMuted(false)).catch(() => {});
+        document.removeEventListener('click', startAudio);
+      }
+    };
+    document.addEventListener('click', startAudio);
+    return () => document.removeEventListener('click', startAudio);
+  }, [isMuted]);
+
+  const toggleAudio = (e) => {
+    e.stopPropagation();
+    if (!audioRef.current) return;
+    if (isMuted) {
+      audioRef.current.volume = 0.4;
+      audioRef.current.play().then(() => setIsMuted(false)).catch(() => {});
+    } else {
+      audioRef.current.pause();
+      setIsMuted(true);
+    }
+  };
 
   useEffect(() => {
     const savedUser = localStorage.getItem('orbitx_user');
@@ -63,6 +94,12 @@ function App() {
 
   return (
     <div className="relative min-h-screen text-white overflow-hidden">
+      {/* Background Space Music */}
+      <audio ref={audioRef} loop preload="auto">
+         <source src="https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3" type="audio/mpeg" />
+         <source src="https://actions.google.com/sounds/v1/science_fiction/ambient_hum.ogg" type="audio/ogg" />
+      </audio>
+
       {/* Dynamic Background Elements */}
       <div className="fixed inset-0 pointer-events-none opacity-20">
         {[...Array(5)].map((_, i) => (
@@ -121,11 +158,27 @@ function App() {
                 <User className="w-4 h-4" /> Connect ID
               </button>
             )}
+
+            <button 
+              onClick={toggleAudio}
+              className="p-2 ml-4 rounded-full border border-gray-600 text-gray-400 hover:text-[var(--neon-blue)] hover:border-[var(--neon-blue)] transition-all"
+              title="Toggle Space Audio"
+            >
+              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            </button>
           </div>
 
-          <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-            {isMenuOpen ? <X /> : <Menu />}
-          </button>
+          <div className="md:hidden flex items-center gap-4">
+             <button 
+               onClick={toggleAudio}
+               className="p-2 rounded-full border border-gray-600 text-gray-400 hover:text-[var(--neon-blue)] hover:border-[var(--neon-blue)] transition-all"
+             >
+               {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+             </button>
+             <button onClick={() => setIsMenuOpen(!isMenuOpen)}>
+               {isMenuOpen ? <X /> : <Menu />}
+             </button>
+          </div>
         </div>
       </nav>
 
