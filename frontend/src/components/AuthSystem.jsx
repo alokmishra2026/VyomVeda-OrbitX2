@@ -10,6 +10,17 @@ const AuthSystem = ({ onClose, onLogin }) => {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+
+  React.useEffect(() => {
+    let interval;
+    if (resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer]);
 
   const handleRequestOTP = async (e) => {
     e.preventDefault();
@@ -27,6 +38,7 @@ const AuthSystem = ({ onClose, onLogin }) => {
       if (!response.ok) throw new Error(data.error || 'Failed to send OTP');
       
       setOtpSent(true);
+      setResendTimer(60);
       setSuccessMsg('Security code dispatched to your comms channel.');
     } catch (err) {
       setError(err.message);
@@ -154,13 +166,23 @@ const AuthSystem = ({ onClose, onLogin }) => {
               >
                 {loading ? 'Verifying...' : isLogin ? 'Initialize System Access' : 'Register Identity Credentials'}
               </button>
-              <button 
-                type="button"
-                onClick={() => setOtpSent(false)}
-                className="w-full py-2 text-xs text-gray-400 hover:text-white transition-all underline decoration-gray-600 underline-offset-4"
-              >
-                Use a different email address?
-              </button>
+              <div className="flex justify-between items-center mt-4">
+                <button 
+                  type="button"
+                  onClick={() => { setOtpSent(false); setOtp(''); }}
+                  className="text-xs text-gray-400 hover:text-white transition-all underline decoration-gray-600 underline-offset-4"
+                >
+                  Change Email
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleRequestOTP}
+                  disabled={resendTimer > 0 || loading}
+                  className={`text-xs transition-all underline underline-offset-4 ${resendTimer > 0 ? 'text-gray-600 decoration-transparent cursor-not-allowed' : 'text-[var(--neon-blue)] decoration-[var(--neon-blue)] hover:text-white'}`}
+                >
+                  {resendTimer > 0 ? `Resend OTP in ${resendTimer}s` : 'Resend OTP'}
+                </button>
+              </div>
             </form>
           )}
 
