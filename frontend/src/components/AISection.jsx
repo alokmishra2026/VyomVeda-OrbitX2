@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, PhoneCall, Mic, Send, Bot, X, Volume2, VolumeX } from 'lucide-react';
 
-const AISection = () => {
+const AISection = ({ user }) => {
   const [messages, setMessages] = useState([
     { role: 'assistant', text: 'Namaste Alok! VyomVeda AI Brain at your service. How can I assist you with the orbital ecosystem today?' }
   ]);
@@ -211,7 +211,7 @@ const AISection = () => {
              <div className="text-center space-y-8">
                 <div className="relative">
                    <div className="w-48 h-48 rounded-full border-4 border-[var(--neon-blue)] overflow-hidden mx-auto shadow-[0_0_50px_rgba(0,243,255,0.3)]">
-                      <img src="/assets/profile.jpg" alt="Alok" className="w-full h-full object-cover" />
+                      <img src={user?.profilePicture || "/assets/profile.jpg"} alt="User" className="w-full h-full object-cover" />
                    </div>
                    <div className="absolute inset-0 rounded-full border-2 border-white/20 animate-ping" />
                 </div>

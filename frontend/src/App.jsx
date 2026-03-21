@@ -39,10 +39,54 @@ function App() {
   const [themeColor, setThemeColor] = useState('#00f3ff');
   const [user, setUser] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
+  const fileInputRef = useRef(null);
+  const [uploadingDP, setUploadingDP] = useState(false);
   
   // Audio State
   const [isMuted, setIsMuted] = useState(true);
   const audioRef = React.useRef(null);
+
+  const handleDPUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    setUploadingDP(true);
+    const renderCanvas = document.createElement("canvas");
+    const ctx = renderCanvas.getContext("2d");
+    const reader = new FileReader();
+    
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = async () => {
+        renderCanvas.width = 150;
+        renderCanvas.height = 150;
+        ctx.drawImage(img, 0, 0, 150, 150);
+        const base64Data = renderCanvas.toDataURL("image/jpeg", 0.7);
+        
+        try {
+          const token = localStorage.getItem('orbitx_token');
+          const res = await fetch('/api/user/profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ profilePicture: base64Data })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            setUser(data.user);
+            localStorage.setItem('orbitx_user', JSON.stringify(data.user));
+          } else {
+            console.error(data.error);
+          }
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setUploadingDP(false);
+        }
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Play audio on first user interaction
   useEffect(() => {
@@ -145,6 +189,20 @@ function App() {
             
             {user ? (
               <div className="flex items-center gap-4 border-l border-white/20 pl-6">
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleDPUpload} 
+                  accept="image/*" 
+                  className="hidden" 
+                />
+                <button 
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Upload Custom Profile Picture"
+                  className={`relative w-8 h-8 rounded-full border border-[var(--neon-blue)] overflow-hidden hover:scale-110 transition-all ${uploadingDP ? 'opacity-50 animate-pulse' : ''}`}
+                >
+                  <img src={user.profilePicture || '/assets/profile.jpg'} alt="DP" className="w-full h-full object-cover" />
+                </button>
                 <span className="text-gray-300 font-mono text-xs hidden lg:inline">ID: {user.email.split('@')[0]}</span>
                 <button onClick={handleLogout} className="text-red-400 hover:text-red-300 transition-all">
                   <LogOut className="w-4 h-4" />
@@ -210,7 +268,11 @@ function App() {
             {activeTab === 'home' && <Home key="home" setActiveTab={setActiveTab} />}
             {activeTab === 'dashboard' && <Dashboard key="dashboard" />}
             {activeTab === 'apidata' && <APIHub key="apidata" />}
-            {activeTab === 'ai' && <AISection key="ai" />}
+            {activeTab === 'ai' && (
+            <Suspense key="ai" fallback={<LoadingFallback />}>
+               <AISection user={user} />
+            </Suspense>
+          )}
             {activeTab === 'academy' && <YouTubeSection key="academy" />}
             {activeTab === 'future' && <FutureHub key="future" />}
             {activeTab === 'admin' && <AdminPanel key="admin" />}
