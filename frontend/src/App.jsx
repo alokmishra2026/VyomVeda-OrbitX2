@@ -94,10 +94,10 @@ function App() {
 
   return (
     <div className="relative min-h-screen text-white overflow-hidden">
-      {/* Background Space Music */}
+      {/* Background Space Cinematic Music */}
       <audio ref={audioRef} loop preload="auto">
-         <source src="https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3" type="audio/mpeg" />
-         <source src="https://actions.google.com/sounds/v1/science_fiction/ambient_hum.ogg" type="audio/ogg" />
+         <source src="https://cdn.pixabay.com/audio/2022/10/25/audio_51cbfa7717.mp3" type="audio/mpeg" />
+         <source src="https://cdn.pixabay.com/audio/2022/11/22/audio_febc508520.mp3" type="audio/mpeg" />
       </audio>
 
       {/* Dynamic Background Elements */}
