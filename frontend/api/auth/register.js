@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     try { await SystemLog.create({ action: 'Registration', details: email }); } catch(e){}
 
     const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.status(201).json({ token, user: { email: user.email, role: user.role } });
+    res.status(201).json({ token, user: { email: user.email, role: user.role, profilePicture: user.profilePicture } });
   } catch (error) {
     res.status(500).json({ error: 'Server error during registration' });
   }

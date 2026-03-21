@@ -153,9 +153,41 @@ app.post('/api/auth/login', async (req, res) => {
     try { await new SystemLog({ action: 'Login', details: email }).save(); } catch(e){}
 
     const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, user: { email: user.email, role: user.role } });
+    res.json({ token, user: { email: user.email, role: user.role, profilePicture: user.profilePicture } });
   } catch (error) {
     res.status(500).json({ error: 'Server error during login' });
+  }
+});
+
+app.post('/api/user/profile', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const { profilePicture } = req.body;
+
+    if (!profilePicture || !profilePicture.startsWith('data:image/')) {
+        return res.status(400).json({ error: 'Invalid image format. Must be Base64.' });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      decoded.userId, 
+      { profilePicture },
+      { new: true }
+    );
+
+    res.status(200).json({ 
+        message: 'Profile picture updated successfully',
+        user: { 
+            email: updatedUser.email, 
+            role: updatedUser.role,
+            profilePicture: updatedUser.profilePicture 
+        }
+    });
+  } catch (error) {
+    console.error("Local Profile Upload Error:", error);
+    res.status(500).json({ error: 'Failed to update profile picture' });
   }
 });
 
