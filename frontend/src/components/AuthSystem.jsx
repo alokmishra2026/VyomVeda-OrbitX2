@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Lock, Mail, X, Orbit } from 'lucide-react';
+import apiClient from '../api/client';
 
 const AuthSystem = ({ onClose, onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
@@ -27,15 +28,8 @@ const AuthSystem = ({ onClose, onLogin }) => {
     setError('');
     setSuccessMsg('');
     setLoading(true);
-
     try {
-      const response = await fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to send OTP');
+      const res = await apiClient.post('/api/auth/send-otp', { email });
       
       setOtpSent(true);
       setResendTimer(60);
@@ -54,16 +48,8 @@ const AuthSystem = ({ onClose, onLogin }) => {
 
     try {
       const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp })
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Authentication failed');
-      }
+      const res = await apiClient.post(endpoint, { email, otp });
+      const data = res.data;
 
       localStorage.setItem('orbitx_token', data.token);
       localStorage.setItem('orbitx_user', JSON.stringify(data.user));

@@ -60,16 +60,37 @@ const SpaceAcademyLive = ({ onExit }) => {
           </div>
           
           <div className="flex-1 rounded-lg overflow-hidden relative bg-black border border-white/5">
+            {/* Animated fallback underneath in case embed is blocked */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-gray-950 via-blue-950/40 to-black z-0">
+              <div className="w-48 h-48 rounded-full border border-blue-500/30 absolute animate-[spin_20s_linear_infinite] opacity-20"></div>
+              <div className="w-32 h-32 rounded-full border border-cyan-500/30 absolute animate-[spin_12s_linear_infinite_reverse] opacity-30"></div>
+              <div className="text-center z-10 space-y-3">
+                <div className="w-4 h-4 bg-blue-400 rounded-full mx-auto animate-pulse shadow-[0_0_20px_cyan]"></div>
+                <p className="text-cyan-400 text-xs font-bold uppercase tracking-widest">Live ISS Camera Feed</p>
+                <p className="text-gray-500 text-[10px]">Stream loading... or open directly on NASA</p>
+                <a 
+                  href="https://www.youtube.com/watch?v=21X5lGlDOfg" 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="inline-block mt-2 px-4 py-1.5 border border-cyan-500 text-cyan-400 text-[10px] font-bold uppercase rounded hover:bg-cyan-900/50 transition-all"
+                >
+                  Open NASA Live Stream ↗
+                </a>
+              </div>
+            </div>
+
+            {/* NASA ISS 24/7 Live Stream — official NASA HD Earth Viewing */}
             <iframe 
-              className="absolute inset-0 w-full h-full pointer-events-auto" 
-              src="https://www.youtube.com/embed/P9C25Un7xEs?autoplay=1&mute=1&controls=0&modestbranding=1" 
-              title="NASA Live Stream"
+              className="absolute inset-0 w-full h-full pointer-events-auto z-10" 
+              src="https://www.youtube.com/embed/21X5lGlDOfg?autoplay=1&mute=1&controls=1&modestbranding=1&rel=0" 
+              title="NASA ISS Live Earth View"
               frameBorder="0" 
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
               allowFullScreen 
             />
+
             {/* HUD Overlay */}
-            <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/80 to-transparent flex justify-between items-end pointer-events-none">
+            <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/80 to-transparent flex justify-between items-end pointer-events-none z-20">
                <div className="font-mono text-cyan-400 text-xs space-y-1 drop-shadow-md">
                  <p>ALTITUDE: 418.2 KM</p>
                  <p>INCLINATION: 51.6 DEG</p>
@@ -81,6 +102,7 @@ const SpaceAcademyLive = ({ onExit }) => {
             </div>
           </div>
         </div>
+
 
         {/* Live Chat & Quiz Panel */}
         <div className="lg:col-span-1 space-y-4 flex flex-col h-full">

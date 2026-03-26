@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Satellite, 
   MapPin, 
@@ -12,14 +12,33 @@ import {
   Globe,
   ShieldAlert,
   ShieldCheck,
-  Link
+  Link,
+  BrainCircuit,
+  RefreshCw,
+  PlusCircle,
+  X
 } from 'lucide-react';
-import io from 'socket.io-client';
+import socket from '../api/socket'; 
 import ThreeScene from './ThreeScene';
 import NetworkMap from './NetworkMap';
 import VyomvedaSim from './VyomvedaSim';
 
-const socket = io('http://localhost:5001');
+// Status color config
+const STATUS_CFG = {
+  CONNECTED:  { text: 'text-green-400',  border: 'border-green-500/40',  bg: 'bg-green-500/10',  bar: 'bg-green-500',  dot: 'bg-green-500' },
+  ACTIVE:     { text: 'text-cyan-400',   border: 'border-cyan-500/40',   bg: 'bg-cyan-500/10',   bar: 'bg-cyan-400',   dot: 'bg-cyan-400' },
+  SYNCING:    { text: 'text-yellow-400', border: 'border-yellow-500/40', bg: 'bg-yellow-500/10', bar: 'bg-yellow-400', dot: 'bg-yellow-400' },
+  OFFLINE:    { text: 'text-red-400',    border: 'border-red-500/40',    bg: 'bg-red-500/10',    bar: 'bg-red-500',    dot: 'bg-red-500' },
+  ERROR:      { text: 'text-red-500',    border: 'border-red-600/60',    bg: 'bg-red-900/20',    bar: 'bg-red-600',    dot: 'bg-red-600' },
+};
+
+const MODULE_ICONS = {
+  'micro-sats':      <Satellite className="w-6 h-6" />,
+  'rovers':          <Radio className="w-6 h-6" />,
+  'ai-brain':        <BrainCircuit className="w-6 h-6" />,
+  'global-sim':      <Wifi className="w-6 h-6" />,
+  'ground-stations': <Globe className="w-6 h-6" />,
+};
 
 const Dashboard = () => {
   const [telemetry, setTelemetry] = useState({
@@ -185,48 +204,9 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Connectivity & Linking Grid */}
+      {/* ===== Live System Connectivity Section ===== */}
       <div className="md:col-span-12 glass-panel p-8 neon-border-blue min-h-[300px]">
-         <div className="flex justify-between items-center mb-8">
-            <h3 className="text-2xl font-bold flex items-center italic">
-               <Link className="w-6 h-6 mr-3 neon-text-blue" />
-               OrbitX System Connectivity
-            </h3>
-            <span className="text-xs font-mono text-green-400 animate-pulse">ALL SYSTEMS LINKED: 100%</span>
-         </div>
-         
-         <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-            {[
-               { name: 'Micro-Sats', status: 'Linked', icon: <Satellite /> },
-               { name: 'Rovers', status: 'Active', icon: <Activity /> },
-               { name: 'AI Brain', status: 'Sync', icon: <Cpu /> },
-               { name: 'Global SIM', status: 'Secure', icon: <Wifi /> },
-               { name: 'Ground St.', status: 'Online', icon: <Globe /> }
-            ].map((sys, i) => (
-               <div key={i} className="flex flex-col items-center p-6 glass-panel border-white/5 hover:neon-border-blue transition-all group cursor-pointer">
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white/5 mb-4 group-hover:scale-110 transition-all neon-text-blue">
-                     {sys.icon}
-                  </div>
-                  <p className="text-sm font-bold mb-1">{sys.name}</p>
-                  <p className="text-[10px] text-gray-500 font-bold uppercase">{sys.status}</p>
-               </div>
-            ))}
-         </div>
-         
-         <div className="mt-8 pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
-            <p className="text-xs text-gray-500 max-w-md">
-               The OrbitX ecosystem ensures military-grade encryption across all nodes. Use the Connectivity Hub to manually bridge or isolate satellite clusters.
-            </p>
-            <div className="flex gap-4">
-               <button className="px-6 py-2 glass-panel border-gray-700 text-xs font-bold hover:neon-border-blue">GLOBAL RESET</button>
-               <button className="px-6 py-2 glass-panel neon-border-blue text-xs font-bold hover:bg-[var(--neon-blue)] hover:text-black">CONNECT NEW NODE</button>
-            </div>
-         </div>
-
-         {/* Detailed Network Map */}
-         <div className="mt-8">
-            <NetworkMap />
-         </div>
+         <NetworkMap />
       </div>
 
 

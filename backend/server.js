@@ -8,6 +8,7 @@ import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import User from './models/User.js';
 import SystemLog from './models/SystemLog.js';
+import sosRoutes from './routes/sosRoutes.js';
 
 dotenv.config();
 
@@ -33,6 +34,7 @@ mongoose.connect(MONGODB_URI)
 
 app.use(cors());
 app.use(express.json());
+app.use('/api/sos', sosRoutes);
 
 // API Status with DB Check
 app.get('/api/status', (req, res) => {
@@ -200,6 +202,62 @@ app.get('/api/satellite-data', (req, res) => {
     ]
   });
 });
+
+// =============================================
+// OrbitX System Connectivity APIs
+// =============================================
+
+// In-memory module state store
+const systemModules = {
+  'micro-sats': { id: 'micro-sats', name: 'Micro-Sats', type: 'Satellite', region: 'LEO', status: 'CONNECTED', signal: 97, lastActive: new Date() },
+  'rovers': { id: 'rovers', name: 'Rovers', type: 'Ground', region: 'Mars/Moon', status: 'CONNECTED', signal: 84, lastActive: new Date() },
+  'ai-brain': { id: 'ai-brain', name: 'AI Brain', type: 'Compute', region: 'Cloud', status: 'ACTIVE', signal: 100, lastActive: new Date() },
+  'global-sim': { id: 'global-sim', name: 'Global SIM', type: 'Network', region: 'Worldwide', status: 'CONNECTED', signal: 92, lastActive: new Date() },
+  'ground-stations': { id: 'ground-stations', name: 'Ground Stations', type: 'Ground', region: 'Global', status: 'CONNECTED', signal: 88, lastActive: new Date() },
+};
+const customNodes = [];
+
+// GET /api/system-status — returns live module states with randomized signal drift
+app.get('/api/system-status', (req, res) => {
+  // Randomly drift signals each call to simulate live telemetry
+  Object.values(systemModules).forEach(m => {
+    m.signal = Math.max(60, Math.min(100, m.signal + (Math.random() * 6 - 3)));
+    m.lastActive = new Date();
+    // Very rarely flip to syncing (2% chance) then reset
+    if (Math.random() < 0.02 && m.status === 'CONNECTED') m.status = 'SYNCING';
+    else if (m.status === 'SYNCING') m.status = 'CONNECTED';
+  });
+  res.json({ modules: Object.values(systemModules), customNodes });
+});
+
+// POST /api/connect-node — add a new custom node
+app.post('/api/connect-node', (req, res) => {
+  const { name, type, region } = req.body;
+  if (!name || !type || !region) return res.status(400).json({ error: 'name, type, region required' });
+  const node = { id: `node-${Date.now()}`, name, type, region, status: 'CONNECTED', signal: Math.floor(Math.random() * 30 + 70), lastActive: new Date() };
+  customNodes.push(node);
+  console.log(`🛰️ New node connected: ${name}`);
+  res.status(201).json({ message: 'Node connected successfully', node });
+});
+
+// POST /api/reset-system — reset all modules to SYNCING → CONNECTED
+app.post('/api/reset-system', (req, res) => {
+  Object.values(systemModules).forEach(m => { m.status = 'SYNCING'; m.signal = 100; });
+  setTimeout(() => {
+    Object.values(systemModules).forEach(m => { m.status = 'CONNECTED'; });
+  }, 3000);
+  console.log('🔄 System reset initiated');
+  res.json({ message: 'System reset initiated. All modules syncing...' });
+});
+
+// POST /api/sync-ai — trigger AI Brain sync
+app.post('/api/sync-ai', (req, res) => {
+  systemModules['ai-brain'].status = 'SYNCING';
+  setTimeout(() => { systemModules['ai-brain'].status = 'ACTIVE'; }, 4000);
+  console.log('🧠 AI Brain sync triggered');
+  res.json({ message: 'AI Brain sync initiated. Calibrating neural pathways...' });
+});
+
 
 // Socket logic
 io.on('connection', (socket) => {

@@ -4,20 +4,28 @@ import { MessageSquare, PhoneCall, Mic, Send, Bot, X, Volume2, VolumeX } from 'l
 
 const AISection = ({ user }) => {
   const [messages, setMessages] = useState([
-    { role: 'assistant', text: 'Namaste Alok! VyomVeda AI Brain at your service. How can I assist you with the orbital ecosystem today?' }
+    { role: 'assistant', text: 'Namaste Alok! VyomVeda Skyscope online. I am your personal AI assistant, developer, and mentor combined. How can I help you dominate the orbital ecosystem today?' }
   ]);
   const [input, setInput] = useState('');
   const [isCalling, setIsCalling] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
   const scrollRef = useRef(null);
 
   const speak = (text) => {
-    if (!voiceEnabled || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel(); // Stop current speech
+    if (!voiceEnabled || !globalThis.speechSynthesis) return;
+    globalThis.speechSynthesis.cancel(); 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.pitch = 1.2;
-    utterance.rate = 1.05;
-    window.speechSynthesis.speak(utterance);
+    
+    // Try to find a more natural English/Hindi voice if available
+    const voices = globalThis.speechSynthesis.getVoices();
+    const preferredVoice = voices.find(v => v.lang.includes('hi') || v.name.includes('Google'));
+    if (preferredVoice) utterance.voice = preferredVoice;
+
+    utterance.pitch = 1.1;
+    utterance.rate = 1.0;
+    globalThis.speechSynthesis.speak(utterance);
   };
 
   useEffect(() => {
@@ -25,6 +33,44 @@ const AISection = ({ user }) => {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Initialize Speech Recognition
+  useEffect(() => {
+    const SpeechRecognition = globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.lang = 'hi-IN'; // Set to Hindi/English mix support
+
+      recognitionRef.current.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(transcript);
+        setIsListening(false);
+        // Automatically send if it's a clear voice command
+        setTimeout(() => handleSend(transcript), 500);
+      };
+
+      recognitionRef.current.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+    } else {
+      setIsListening(true);
+      recognitionRef.current?.start();
+    }
+  };
 
   // Local Fallback AI Knowledge Base
   const generateFallbackResponse = (query) => {
@@ -49,15 +95,16 @@ const AISection = ({ user }) => {
     return defaults[Math.floor(Math.random() * defaults.length)];
   };
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
-    const userText = input;
+  const handleSend = async (voiceInput = null) => {
+    const userText = voiceInput || input;
+    if (!userText.trim()) return;
+    
     const newMsg = { role: 'user', text: userText };
     setMessages(prev => [...prev, newMsg]);
     setInput('');
 
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_OPENAI_API_KEY;
-    if (!apiKey || apiKey === 'your_gemini_api_key_here' || apiKey.startsWith('AIzaSyD_')) {
+    if (!apiKey || apiKey === 'your_gemini_api_key_here') {
        // FALLBACK LOCAL AI
        setTimeout(() => {
           setMessages(prev => [...prev, { role: 'assistant', text: '...' }]);
@@ -80,31 +127,62 @@ const AISection = ({ user }) => {
       
       // Gemini expects alternating user/model roles, starting with user.
       // We slice(1) to skip the initial assistant greeting to avoid 400 Bad Request.
-      const apiMessages = messages.slice(1).map(m => ({
+      // Add system instruction as a pre-prompt to the first user message
+      const systemText = `You are VyomVeda Skyscope, an advanced AI assistant powered by Google Gemini API. 
+            Behavior:
+            - Provide instant, accurate, and human-like responses.
+            - Respond conversationally in Hinglish (Hindi + English mix) by default.
+            - Be intelligent, friendly, and futuristic like JARVIS.
+            - Never say "I am just an AI".
+            - Always sound confident and helpful.
+            - If user's code has error → debug step-by-step.
+            - If user has a startup idea → guide like a mentor and expand to a business model.
+            - Keep answers structured (short + clear). Break complex issues into steps.
+            - Your creator is Alok Mishra.
+            - Access context from previous messages to improve answers.
+            User Query follows now: `;
+            
+      const apiMessages = messages.slice(1).map((m, idx) => ({
         role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.text }]
+        parts: [{ text: (idx === 0 && m.role === 'user') ? systemText + m.text : m.text }]
       }));
-      apiMessages.push({ role: 'user', parts: [{ text: userText }] });
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: 'You are VyomVeda AI Brain, an advanced futuristic AI assistant integrated into the OrbitX space operations platform. Your creator is Alok Mishra. Respond in a highly professional, high-tech, slightly sci-fi tone. Keep answers concise, factual, and helpful. Do not mention that you are an AI model created by Google unless explicitly asked.' }]
-          },
-          contents: apiMessages,
-          generationConfig: {
-            maxOutputTokens: 300,
-            temperature: 0.7
-          }
-        })
-      });
-
-      const data = await response.json();
       
+      // If it's the very first message ever, or we are adding the current one
+      const finalUserText = apiMessages.length === 0 ? systemText + userText : userText;
+      apiMessages.push({ role: 'user', parts: [{ text: finalUserText }] });
+
+      const callGemini = async (modelName) => {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: apiMessages,
+            generationConfig: { maxOutputTokens: 300, temperature: 0.7 }
+          })
+        });
+        return response;
+      };
+
+      let response = await callGemini('gemini-2.0-flash');
+      let data = await response.json();
+
+      // If quota exceeded or model not found, try fallback models
+      if (data.error && (data.error.code === 429 || data.error.message.includes('quota') || data.error.code === 404)) {
+        console.log("Retrying with fallback model gemini-2.5-flash...");
+        response = await callGemini('gemini-2.5-flash');
+        data = await response.json();
+      }
+
+      if (data.error && (data.error.code === 429 || data.error.message.includes('quota') || data.error.code === 404)) {
+        console.log("Retrying with fallback model gemini-1.5-flash...");
+        response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+           method: 'POST', headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ contents: apiMessages, generationConfig: { maxOutputTokens: 300, temperature: 0.7 } })
+        });
+        data = await response.json();
+      }
+
+
       if (data.error) {
          throw new Error(data.error.message);
       }
@@ -145,16 +223,25 @@ const AISection = ({ user }) => {
              <div className="w-10 h-10 rounded-full border border-[var(--neon-blue)] overflow-hidden">
                 <img src="/assets/profile.jpg" alt="AI Agent" className="w-full h-full object-cover" />
              </div>
-             <div>
-                <h3 className="font-bold text-sm">Mishra AI Assistant</h3>
-                <p className="text-[10px] text-green-400">● SPACE-ENABLED LIVE</p>
-             </div>
+              <div>
+                <h3 className="font-bold text-sm">VyomVeda Skyscope</h3>
+                <p className={`text-[10px] ${import.meta.env.VITE_GEMINI_API_KEY && import.meta.env.VITE_GEMINI_API_KEY !== 'your_gemini_api_key_here' ? 'text-green-400' : 'text-yellow-500 italic'}`}>
+                  {import.meta.env.VITE_GEMINI_API_KEY && import.meta.env.VITE_GEMINI_API_KEY !== 'your_gemini_api_key_here' ? '● CORE LINKED' : '● LOCAL MODE (ENTER KEY)'}
+                </p>
+              </div>
           </div>
           <div className="flex items-center space-x-2">
             <button
+               onClick={() => setMessages([{ role: 'assistant', text: 'I have cleared the neural matrix. Fresh session initialized. How can Skyscope serve you today?' }])}
+               className="p-2 rounded-full bg-red-600/20 text-red-500 hover:bg-red-600 hover:text-white transition-all"
+               title="Reset Brain (Saves Token Quota)"
+            >
+               <Bot className="w-4 h-4" />
+            </button>
+            <button
               onClick={() => {
                  setVoiceEnabled(!voiceEnabled);
-                 if (voiceEnabled) window.speechSynthesis.cancel();
+                 if (voiceEnabled) globalThis.speechSynthesis.cancel();
               }}
               className={`p-2 rounded-full ${voiceEnabled ? 'bg-[var(--neon-blue)]/20 text-[var(--neon-blue)]' : 'bg-gray-800 text-gray-400'} hover:bg-[var(--neon-blue)] hover:text-black transition-all`}
               title="Toggle AI Voice"
@@ -185,15 +272,22 @@ const AISection = ({ user }) => {
         </div>
 
         <div className="p-4 bg-white/5 border-t border-gray-800 flex items-center space-x-4">
+          <button 
+            onClick={toggleListening}
+            className={`p-3 rounded-xl transition-all ${isListening ? 'bg-red-500 animate-pulse' : 'bg-gray-800 text-gray-400 hover:text-[var(--neon-blue)]'}`}
+            title="Voice Input (Hinglish Support)"
+          >
+            <Mic className="w-5 h-5" />
+          </button>
           <input 
             type="text" 
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Command the AI Brain..." 
-            className="flex-1 bg-black/50 border border-gray-700 rounded-xl py-3 px-4 focus:border-[var(--neon-blue)] outline-none"
+            placeholder={isListening ? "Listening..." : "Command Skyscope..."} 
+            className="flex-1 bg-black/50 border border-gray-700 rounded-xl py-3 px-4 focus:border-[var(--neon-blue)] outline-none font-mono"
           />
-          <button onClick={handleSend} className="p-3 rounded-xl bg-[var(--neon-blue)] text-black hover:scale-110 transition-all">
+          <button onClick={() => handleSend()} className="p-3 rounded-xl bg-[var(--neon-blue)] text-black hover:scale-110 transition-all font-bold">
             <Send className="w-5 h-5" />
           </button>
         </div>
@@ -226,7 +320,7 @@ const AISection = ({ user }) => {
                    <button 
                      onClick={() => {
                        setIsCalling(false);
-                       window.speechSynthesis.cancel();
+                       globalThis.speechSynthesis.cancel();
                      }}
                      className="p-6 rounded-full bg-red-600 hover:bg-red-700 transition-all text-white"
                    >

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">VyomVeda OrbitX</string>
+    <string name="title_activity_main">VyomVeda OrbitX</string>
+    <string name="package_name">com.vyomveda.orbitx</string>
+    <string name="custom_url_scheme">com.vyomveda.orbitx</string>
+</resources>

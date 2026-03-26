@@ -13,8 +13,11 @@ import {
   User,
   LogOut,
   Volume2,
-  VolumeX
+  VolumeX,
+  ShieldAlert
 } from 'lucide-react';
+import apiClient from './api/client'; // NEW: Centralized API
+import MobileTabNavigation from './components/MobileTabNavigation'; // NEW: Mobile UI
 
 // Use React.lazy so any failing component is caught by ErrorBoundary
 const Home = React.lazy(() => import('./components/Home'));
@@ -26,6 +29,7 @@ const AuthSystem = React.lazy(() => import('./components/AuthSystem'));
 const APIHub = React.lazy(() => import('./components/APIHub'));
 const AdminPanel = React.lazy(() => import('./components/AdminPanel'));
 const SatBuilder = React.lazy(() => import('./components/SatBuilder'));
+const GlobalSOS = React.lazy(() => import('./components/GlobalSOS'));
 
 const LoadingFallback = () => (
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', color: '#00f3ff', fontFamily: 'monospace' }}>
@@ -44,6 +48,7 @@ function App() {
   
   // Audio State
   const [isMuted, setIsMuted] = useState(true);
+  const [hasEngaged, setHasEngaged] = useState(false);
   const audioRef = React.useRef(null);
 
   const handleDPUpload = (e) => {
@@ -64,21 +69,11 @@ function App() {
         const base64Data = renderCanvas.toDataURL("image/jpeg", 0.7);
         
         try {
-          const token = localStorage.getItem('orbitx_token');
-          const res = await fetch('/api/user/profile', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ profilePicture: base64Data })
-          });
-          const data = await res.json();
-          if (res.ok) {
-            setUser(data.user);
-            localStorage.setItem('orbitx_user', JSON.stringify(data.user));
-          } else {
-            console.error(data.error);
-          }
+          const res = await apiClient.post('/api/user/profile', { profilePicture: base64Data }); // Changed to apiClient
+          setUser(res.data.user);
+          localStorage.setItem('orbitx_user', JSON.stringify(res.data.user));
         } catch (err) {
-          console.error(err);
+          console.error('Failed to upload DP:', err);
         } finally {
           setUploadingDP(false);
         }
@@ -88,18 +83,13 @@ function App() {
     reader.readAsDataURL(file);
   };
 
-  // Play audio on first user interaction
-  useEffect(() => {
-    const startAudio = () => {
-      if (audioRef.current && isMuted) {
-        audioRef.current.volume = 0.4;
-        audioRef.current.play().then(() => setIsMuted(false)).catch(() => {});
-        document.removeEventListener('click', startAudio);
-      }
-    };
-    document.addEventListener('click', startAudio);
-    return () => document.removeEventListener('click', startAudio);
-  }, [isMuted]);
+  const engageSystem = () => {
+    setHasEngaged(true);
+    if (audioRef.current) {
+      audioRef.current.volume = 0.4;
+      audioRef.current.play().then(() => setIsMuted(false)).catch((err) => console.log("Audio play blocked", err));
+    }
+  };
 
   const toggleAudio = (e) => {
     e.stopPropagation();
@@ -137,15 +127,63 @@ function App() {
   }, []);
 
   return (
-    <div className="relative min-h-screen text-white overflow-hidden">
+    <div className="relative min-h-screen text-white overflow-hidden bg-black">
       {/* Background Space Cinematic Music */}
       <audio ref={audioRef} loop preload="auto">
-         <source src="https://cdn.pixabay.com/audio/2022/10/25/audio_51cbfa7717.mp3" type="audio/mpeg" />
-         <source src="https://cdn.pixabay.com/audio/2022/11/22/audio_febc508520.mp3" type="audio/mpeg" />
+         <source src="https://cdn.pixabay.com/audio/2022/02/10/audio_fc8626f21c.mp3" type="audio/mpeg" />
       </audio>
 
+      {/* Entry Overlay for Autoplay & Cinematic Effect */}
+      <AnimatePresence>
+        {!hasEngaged && (
+          <motion.div 
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 1.1 }}
+            transition={{ duration: 1 }}
+            className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center space-y-8"
+          >
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 1, delay: 0.5 }}
+              className="relative"
+            >
+              <div className="absolute inset-0 blur-3xl bg-[var(--neon-blue)] opacity-20 animate-pulse rounded-full" />
+              <Rocket className="w-24 h-24 neon-text-blue relative z-10" />
+            </motion.div>
+            
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 1 }}
+              className="text-center space-y-2"
+            >
+              <h1 className="text-4xl font-bold tracking-[0.2em]">VYOMVEDA <span className="neon-text-blue">ORBITX</span></h1>
+              <p className="text-gray-500 uppercase tracking-widest text-xs">A Global Space-Tech & AI Ecosystem</p>
+            </motion.div>
+
+            <motion.button
+              whileHover={{ scale: 1.05, boxShadow: "0 0 30px var(--neon-blue)" }}
+              whileTap={{ scale: 0.95 }}
+              onClick={engageSystem}
+              className="px-8 py-3 bg-[var(--neon-blue)] text-black font-bold rounded-lg transition-all"
+            >
+              ENGAGE ORBITAL SYSTEMS
+            </motion.button>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.5 }}
+              transition={{ delay: 1.5 }}
+              className="text-[10px] uppercase tracking-[0.5em] text-gray-400"
+            >
+              (Audio Recommended)
+            </motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Dynamic Background Elements */}
-      <div className="fixed inset-0 pointer-events-none opacity-20">
+      <div className="fixed inset-0 pointer-events-none opacity-20 hidden md:block">
         {[...Array(5)].map((_, i) => (
           <div key={i} className="absolute blur-3xl rounded-full" 
                style={{ 
@@ -159,24 +197,15 @@ function App() {
         ))}
       </div>
 
-      {/* Floating Elements */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <Rocket className="floating-jet" style={{ top: '15%', animationDelay: '0s' }} />
-        <Rocket className="floating-jet-reverse" style={{ top: '35%', animationDelay: '5s' }} />
-        <Satellite className="floating-sat" style={{ top: '65%', left: '8%', animationDelay: '2s' }} />
-        <Bot className="floating-drone" style={{ bottom: '15%', right: '20%', animationDelay: '3s' }} />
-        <Zap className="floating-jet" style={{ top: '80%', animationDelay: '10s', transform: 'scale(0.4)' }} />
-      </div>
-
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4">
+      {/* Navigation - Desktop only */}
+      <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 hidden md:block">
         <div className="max-w-7xl mx-auto flex justify-between items-center glass-panel px-6 py-3 neon-border-blue">
           <div className="flex items-center space-x-2">
             <Rocket className="w-8 h-8 neon-text-blue" />
             <span className="text-xl font-bold tracking-tighter">VyomVeda <span className="neon-text-blue">OrbitX</span></span>
           </div>
 
-          <div className="hidden md:flex space-x-8 items-center">
+          <div className="flex space-x-8 items-center">
             {['home', 'dashboard', 'apidata', 'academy', 'ai', 'future', ...(user?.role === 'admin' ? ['admin'] : [])].map((tab) => (
               <button 
                 key={tab} 
@@ -187,116 +216,88 @@ function App() {
               </button>
             ))}
             
+            <button 
+              onClick={() => setActiveTab('sos')}
+              className={`capitalize transition-all font-bold flex items-center gap-1 ml-4 ${activeTab === 'sos' ? 'text-red-500 shadow-[0_0_15px_red] bg-red-900/20 px-3 py-1 rounded' : 'text-red-400 hover:text-red-300 border border-red-500/50 px-3 py-1 rounded'}`}
+            >
+              <ShieldAlert className="w-4 h-4" /> SOS
+            </button>
+            
             {user ? (
               <div className="flex items-center gap-4 border-l border-white/20 pl-6">
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleDPUpload} 
-                  accept="image/*" 
-                  className="hidden" 
-                />
+                <input type="file" ref={fileInputRef} onChange={handleDPUpload} accept="image/*" className="hidden" />
                 <button 
                   onClick={() => fileInputRef.current?.click()}
-                  title="Upload Custom Profile Picture"
                   className={`relative w-8 h-8 rounded-full border border-[var(--neon-blue)] overflow-hidden hover:scale-110 transition-all ${uploadingDP ? 'opacity-50 animate-pulse' : ''}`}
                 >
                   <img src={user.profilePicture || '/assets/profile.jpg'} alt="DP" className="w-full h-full object-cover" />
                 </button>
-                <span className="text-gray-300 font-mono text-xs hidden lg:inline">ID: {user.email.split('@')[0]}</span>
                 <button onClick={handleLogout} className="text-red-400 hover:text-red-300 transition-all">
                   <LogOut className="w-4 h-4" />
                 </button>
               </div>
             ) : (
-              <button 
-                onClick={() => setShowAuth(true)}
-                className="flex items-center gap-2 px-4 py-2 border border-blue-500/50 rounded-lg text-blue-400 hover:bg-blue-500 hover:text-black transition-all text-xs font-bold uppercase tracking-widest ml-4"
-              >
+              <button onClick={() => setShowAuth(true)} className="flex items-center gap-2 px-4 py-2 border border-blue-500/50 rounded-lg text-blue-400 hover:bg-blue-500 hover:text-black transition-all text-xs font-bold uppercase tracking-widest ml-4">
                 <User className="w-4 h-4" /> Connect ID
               </button>
             )}
 
-            <button 
-              onClick={toggleAudio}
-              className="p-2 ml-4 rounded-full border border-gray-600 text-gray-400 hover:text-[var(--neon-blue)] hover:border-[var(--neon-blue)] transition-all"
-              title="Toggle Space Audio"
-            >
+            <button onClick={toggleAudio} className="p-2 ml-4 rounded-full border border-gray-600 text-gray-400 hover:text-[var(--neon-blue)] hover:border-[var(--neon-blue)]">
               {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
             </button>
-          </div>
-
-          <div className="md:hidden flex items-center gap-4">
-             <button 
-               onClick={toggleAudio}
-               className="p-2 rounded-full border border-gray-600 text-gray-400 hover:text-[var(--neon-blue)] hover:border-[var(--neon-blue)] transition-all"
-             >
-               {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-             </button>
-             <button onClick={() => setIsMenuOpen(!isMenuOpen)}>
-               {isMenuOpen ? <X /> : <Menu />}
-             </button>
           </div>
         </div>
       </nav>
 
-      {/* Mobile Menu */}
-      <AnimatePresence>
-        {isMenuOpen && (
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="fixed top-20 right-6 z-50 md:hidden w-48 glass-panel p-4 neon-border-blue"
-          >
-            {['home', 'dashboard', 'apidata', 'academy', 'ai', 'future'].map((tab) => (
-              <button 
-                key={tab} 
-                className="block w-full text-left py-2 capitalize transition-all hover:neon-text-blue"
-                onClick={() => { setActiveTab(tab); setIsMenuOpen(false); }}
-              >
-                {tab === 'academy' ? 'OrbitX Academy' : tab === 'future' ? 'Future Hub' : tab === 'apidata' ? 'API Hub' : tab}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Mobile Top Header */}
+      <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md px-6 py-4 flex justify-between items-center border-b border-blue-500/20">
+        <div className="flex items-center space-x-2">
+          <Rocket className="w-6 h-6 neon-text-blue" />
+          <span className="text-lg font-bold">VyomVeda <span className="neon-text-blue">OrbitX</span></span>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={toggleAudio} className="text-gray-400">
+            {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+          </button>
+          {user && (
+            <img src={user.profilePicture || '/assets/profile.jpg'} className="w-8 h-8 rounded-full border border-blue-500" />
+          )}
+        </div>
+      </header>
 
-      <main className="pt-24 pb-12 px-6 relative z-10 max-w-7xl mx-auto">
+      <main className="pt-20 md:pt-24 pb-24 md:pb-12 px-6 relative z-10 max-w-7xl mx-auto">
         <Suspense fallback={<LoadingFallback />}>
           <AnimatePresence mode="wait">
             {activeTab === 'home' && <Home key="home" setActiveTab={setActiveTab} />}
             {activeTab === 'dashboard' && <Dashboard key="dashboard" />}
             {activeTab === 'apidata' && <APIHub key="apidata" />}
-            {activeTab === 'ai' && (
-            <Suspense key="ai" fallback={<LoadingFallback />}>
-               <AISection user={user} />
-            </Suspense>
-          )}
+            {activeTab === 'ai' && <AISection user={user} key="ai" />}
             {activeTab === 'academy' && <YouTubeSection key="academy" />}
             {activeTab === 'future' && <FutureHub key="future" />}
-            {activeTab === 'admin' && <AdminPanel key="admin" />}
+            {activeTab === 'admin' && <AdminPanel key="admin" onExit={() => setActiveTab('home')} />}
             {activeTab === 'satbuilder' && <SatBuilder key="satbuilder" onExit={() => setActiveTab('home')} />}
+            {activeTab === 'sos' && <GlobalSOS key="sos" user={user} />}
           </AnimatePresence>
         </Suspense>
       </main>
 
-      {/* Persistent AI Assistant */}
-      <div className="fixed bottom-6 right-6 z-50">
+      {/* Mobile Bottom Tab Bar */}
+      <MobileTabNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
+
+      {/* Desktop AI Assistant Floating */}
+      <div className="fixed bottom-6 right-6 z-50 hidden md:block">
         <motion.button 
           whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
           onClick={() => setActiveTab('ai')}
           className="flex items-center space-x-3 glass-panel p-3 px-5 neon-border-blue"
         >
           <div className="w-10 h-10 rounded-full border-2 border-[var(--neon-blue)] bg-blue-900 flex items-center justify-center">
             <Bot className="w-5 h-5 neon-text-blue" />
           </div>
-          <div className="flex flex-col items-start leading-tight">
+          <div className="flex flex-col items-start leading-tight text-left">
             <span className="text-xs font-bold neon-text-blue">AI COMMAND</span>
-            <span className="text-sm">Mishra Assistant</span>
+            <span className="text-sm">OrbitX Assistant</span>
           </div>
-          <MessageSquare className="w-5 h-5 ml-2" />
         </motion.button>
       </div>
 
